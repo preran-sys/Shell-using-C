@@ -1,0 +1,30 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Linker Files
+*.gch
+*.pch
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+*.exe
+*.out
+*.app
+
+# CMake build directory
+/cmake-build-debug/
+/cmake-build-release/
+
+# JetBrains / CLion IDE configuration
+.idea/
