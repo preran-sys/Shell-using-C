@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
 #define LIMIT 1024
 
 int main(void) {
@@ -14,19 +16,23 @@ int main(void) {
 
         // Read user input
         char command[LIMIT];
-        char * user_input = fgets(command, sizeof(command), stdin);
+        fgets(command, sizeof(command), stdin);
 
         // Replace \n with \0 fgets output
         command[strcspn(command, "\n")] = '\0';         // Source - https://stackoverflow.com/a/28462221 // Posted by Tim Čas // Retrieved 2026-06-14, License - CC BY-SA 3.0
 
-        // Print invalid command format "<command>: command not found"
-        printf("%s: command not found\n", user_input);
+        // Halt - user input "exit"
+        if (strcmp(command, "exit") == 0) {
+            break;
+        } else {
+            // Print invalid command format "<command>: command not found"
+            printf("%s: command not found\n", command);
+        }
+
     } while (true);
 
     return 0;
 }
-
-
 
 
 
