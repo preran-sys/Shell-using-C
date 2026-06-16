@@ -4,12 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define LIMIT 512
 
 void execute_user_input(char command[LIMIT]);
-char ** delimit(const char * delimiter, char *argv[LIMIT]);
+char ** delimit(const char * delimiter, char *argv[LIMIT], const char * literal);
 bool file_exists(const char *filename);
+bool executable(char command[LIMIT]);
+void free_tokens(char *arr[]);
 
 int main(void) {
     setbuf(stdout, NULL);               // no mem buffer, instant output
@@ -98,9 +101,9 @@ void execute_user_input(char command[LIMIT]) {
             // If T2 and T3 true together, print "<command> is <full_path>", stop
             // If T2 true and T3 false, move to next directory in T1
             char *argv[LIMIT];
-            char ** path_directories = delimit(":", argv);
-
-            if (path_directories != NULL) {
+            const char * environment = getenv("PATH");          // NUL-terminated string // should not modify the string pointed to by the getenv() function
+            if (environment != NULL) {
+                char ** path_directories = delimit(":", argv, environment);
                 while (*path_directories != NULL) {
                     char file[1024];
                     snprintf(file, sizeof(file), "%s/%s" ,*path_directories, command + 5);
@@ -113,19 +116,91 @@ void execute_user_input(char command[LIMIT]) {
                     } else {
                         path_directories++;
                     }
-                }
             }
 
-            // Clean up individual tokens
-            for (int i = 0; argv[i] != NULL; i++) {
-                free(argv[i]);
+                // Clean up individual tokens
+                for (int i = 0; argv[i] != NULL; i++) {
+                    free(argv[i]);
+                }
             }
         }
     } else {
-        // Print invalid command format "<command>: command not found"
-        printf("%s: command not found\n", command);
+        if (executable(command)) {
+            //
+        } else {
+            // Print invalid command format "<command>: command not found"
+            printf("%s: command not found\n", command);
+        }
     }
 }
+
+// Verify provided shell command is executable and execute
+bool executable(char command[LIMIT]) {
+    // T1: Delimit env path
+    char * argv[LIMIT];
+    const char * environment = getenv("PATH");
+    char ** path_directories = delimit(":", argv, environment);
+    // T2: Iterate through each path directory
+
+    char * av[LIMIT];
+    delimit(" ", av, command);
+    char * arg0 = av[0];
+    while (*path_directories != NULL) {
+        char file[1024];
+        snprintf(file, sizeof(file), "%s/%s", *path_directories, arg0);
+        // T3: Verify file with argv[0] name exists
+        if (file_exists(file)) {
+            // T4: Verify executable permission
+            if (access(file, X_OK) == 0) {
+                // printf("%s is %s\n", arg0, file);
+
+                pid_t pid = fork();// pid_t is the datatype used to store process IDs.
+
+                if (pid < 0) {
+                    // fork failed
+                    printf("fork failed!\n");
+                }
+                else if (pid == 0) {
+                    // Child process
+                    execv(file, av);
+
+                    // If we reach this line, execv failed!
+                    perror("execv failed");
+
+                    // Terminate the child process immediately so it does not return to the shell loop
+                    exit(1);
+                }
+                else {
+                    // Parent process
+                    // printf("Parent: waiting for child...\n");
+                    wait(NULL);
+                    // printf("Parent: child finished.\n");
+                }
+
+                // T5: If T2 and T3 true together, true lets run execute(command), stop
+                free_tokens(argv);
+                free_tokens(av);
+                return true;
+            }
+            // T6: If T2 true and T3 false, move to next directory in T1
+            path_directories++;
+        } else {
+            path_directories++;
+        }
+    }
+    // Clean up individual tokens
+    free_tokens(argv);
+    free_tokens(av);
+    return false;
+}
+
+// Helper to free a null-terminated array of strings
+void free_tokens(char *arr[]) {
+    for (int i = 0; arr[i] != NULL; i++) {
+        free(arr[i]);
+    }
+}
+
 
 // return true if the file specified
 // by the filename exists
@@ -139,13 +214,8 @@ bool file_exists(const char *filename)
 // T2: Separate T1 string output whenever ":" (abstractable)
 // T3: Store each substring separated from T2 in an array
 // T4: Return the data for further filtering
-char ** delimit(const char * delimiter, char *argv[LIMIT]) {
-    const char * environment = getenv("PATH");          // NUL-terminated string // should not modify the string pointed to by the getenv() function
-    if (environment == NULL) {
-        return NULL;
-    }
-
-    char *string = strdup(environment);
+char ** delimit(const char * delimiter, char *argv[LIMIT], const char * literal) {
+    char *string = strdup(literal);
     char *tofree = string;
     char **ap = argv;
     char *token;
